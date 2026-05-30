@@ -13,9 +13,14 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppProductsRouteImport } from './routes/_app.products'
+import { Route as AppPaymentsRouteImport } from './routes/_app.payments'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppSuppliersIndexRouteImport } from './routes/_app.suppliers.index'
+import { Route as AppReceivingIndexRouteImport } from './routes/_app.receiving.index'
+import { Route as AppPurchaseOrdersIndexRouteImport } from './routes/_app.purchase-orders.index'
 import { Route as AppSuppliersIdRouteImport } from './routes/_app.suppliers.$id'
+import { Route as AppReceivingIdRouteImport } from './routes/_app.receiving.$id'
+import { Route as AppPurchaseOrdersIdRouteImport } from './routes/_app.purchase-orders.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -36,6 +41,11 @@ const AppProductsRoute = AppProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPaymentsRoute = AppPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -46,9 +56,29 @@ const AppSuppliersIndexRoute = AppSuppliersIndexRouteImport.update({
   path: '/suppliers/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppReceivingIndexRoute = AppReceivingIndexRouteImport.update({
+  id: '/receiving/',
+  path: '/receiving/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPurchaseOrdersIndexRoute = AppPurchaseOrdersIndexRouteImport.update({
+  id: '/purchase-orders/',
+  path: '/purchase-orders/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSuppliersIdRoute = AppSuppliersIdRouteImport.update({
   id: '/suppliers/$id',
   path: '/suppliers/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReceivingIdRoute = AppReceivingIdRouteImport.update({
+  id: '/receiving/$id',
+  path: '/receiving/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPurchaseOrdersIdRoute = AppPurchaseOrdersIdRouteImport.update({
+  id: '/purchase-orders/$id',
+  path: '/purchase-orders/$id',
   getParentRoute: () => AppRoute,
 } as any)
 
@@ -56,16 +86,26 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AppDashboardRoute
+  '/payments': typeof AppPaymentsRoute
   '/products': typeof AppProductsRoute
+  '/purchase-orders/$id': typeof AppPurchaseOrdersIdRoute
+  '/receiving/$id': typeof AppReceivingIdRoute
   '/suppliers/$id': typeof AppSuppliersIdRoute
+  '/purchase-orders/': typeof AppPurchaseOrdersIndexRoute
+  '/receiving/': typeof AppReceivingIndexRoute
   '/suppliers/': typeof AppSuppliersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AppDashboardRoute
+  '/payments': typeof AppPaymentsRoute
   '/products': typeof AppProductsRoute
+  '/purchase-orders/$id': typeof AppPurchaseOrdersIdRoute
+  '/receiving/$id': typeof AppReceivingIdRoute
   '/suppliers/$id': typeof AppSuppliersIdRoute
+  '/purchase-orders': typeof AppPurchaseOrdersIndexRoute
+  '/receiving': typeof AppReceivingIndexRoute
   '/suppliers': typeof AppSuppliersIndexRoute
 }
 export interface FileRoutesById {
@@ -74,8 +114,13 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/payments': typeof AppPaymentsRoute
   '/_app/products': typeof AppProductsRoute
+  '/_app/purchase-orders/$id': typeof AppPurchaseOrdersIdRoute
+  '/_app/receiving/$id': typeof AppReceivingIdRoute
   '/_app/suppliers/$id': typeof AppSuppliersIdRoute
+  '/_app/purchase-orders/': typeof AppPurchaseOrdersIndexRoute
+  '/_app/receiving/': typeof AppReceivingIndexRoute
   '/_app/suppliers/': typeof AppSuppliersIndexRoute
 }
 export interface FileRouteTypes {
@@ -84,16 +129,26 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/payments'
     | '/products'
+    | '/purchase-orders/$id'
+    | '/receiving/$id'
     | '/suppliers/$id'
+    | '/purchase-orders/'
+    | '/receiving/'
     | '/suppliers/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/dashboard'
+    | '/payments'
     | '/products'
+    | '/purchase-orders/$id'
+    | '/receiving/$id'
     | '/suppliers/$id'
+    | '/purchase-orders'
+    | '/receiving'
     | '/suppliers'
   id:
     | '__root__'
@@ -101,8 +156,13 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/_app/dashboard'
+    | '/_app/payments'
     | '/_app/products'
+    | '/_app/purchase-orders/$id'
+    | '/_app/receiving/$id'
     | '/_app/suppliers/$id'
+    | '/_app/purchase-orders/'
+    | '/_app/receiving/'
     | '/_app/suppliers/'
   fileRoutesById: FileRoutesById
 }
@@ -142,6 +202,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProductsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/payments': {
+      id: '/_app/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AppPaymentsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -156,6 +223,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSuppliersIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/receiving/': {
+      id: '/_app/receiving/'
+      path: '/receiving'
+      fullPath: '/receiving/'
+      preLoaderRoute: typeof AppReceivingIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/purchase-orders/': {
+      id: '/_app/purchase-orders/'
+      path: '/purchase-orders'
+      fullPath: '/purchase-orders/'
+      preLoaderRoute: typeof AppPurchaseOrdersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/suppliers/$id': {
       id: '/_app/suppliers/$id'
       path: '/suppliers/$id'
@@ -163,20 +244,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSuppliersIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/receiving/$id': {
+      id: '/_app/receiving/$id'
+      path: '/receiving/$id'
+      fullPath: '/receiving/$id'
+      preLoaderRoute: typeof AppReceivingIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/purchase-orders/$id': {
+      id: '/_app/purchase-orders/$id'
+      path: '/purchase-orders/$id'
+      fullPath: '/purchase-orders/$id'
+      preLoaderRoute: typeof AppPurchaseOrdersIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
+  AppPaymentsRoute: typeof AppPaymentsRoute
   AppProductsRoute: typeof AppProductsRoute
+  AppPurchaseOrdersIdRoute: typeof AppPurchaseOrdersIdRoute
+  AppReceivingIdRoute: typeof AppReceivingIdRoute
   AppSuppliersIdRoute: typeof AppSuppliersIdRoute
+  AppPurchaseOrdersIndexRoute: typeof AppPurchaseOrdersIndexRoute
+  AppReceivingIndexRoute: typeof AppReceivingIndexRoute
   AppSuppliersIndexRoute: typeof AppSuppliersIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
+  AppPaymentsRoute: AppPaymentsRoute,
   AppProductsRoute: AppProductsRoute,
+  AppPurchaseOrdersIdRoute: AppPurchaseOrdersIdRoute,
+  AppReceivingIdRoute: AppReceivingIdRoute,
   AppSuppliersIdRoute: AppSuppliersIdRoute,
+  AppPurchaseOrdersIndexRoute: AppPurchaseOrdersIndexRoute,
+  AppReceivingIndexRoute: AppReceivingIndexRoute,
   AppSuppliersIndexRoute: AppSuppliersIndexRoute,
 }
 

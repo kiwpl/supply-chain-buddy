@@ -22,6 +22,7 @@ export type Database = {
           id: string
           method: Database["public"]["Enums"]["payment_method"]
           notes: string | null
+          paid_by: string
           payment_date: string
           po_id: string
           reference: string | null
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
+          paid_by?: string
           payment_date?: string
           po_id: string
           reference?: string | null
@@ -44,11 +46,19 @@ export type Database = {
           id?: string
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
+          paid_by?: string
           payment_date?: string
           po_id?: string
           reference?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "po_payments_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "po_payment_status"
+            referencedColumns: ["po_id"]
+          },
           {
             foreignKeyName: "po_payments_po_id_fkey"
             columns: ["po_id"]
@@ -136,6 +146,13 @@ export type Database = {
             foreignKeyName: "purchase_order_lines_po_id_fkey"
             columns: ["po_id"]
             isOneToOne: false
+            referencedRelation: "po_payment_status"
+            referencedColumns: ["po_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_lines_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
           },
@@ -150,11 +167,14 @@ export type Database = {
       }
       purchase_orders: {
         Row: {
+          comment: string | null
           created_at: string
           created_by: string | null
           currency: string
           expected_date: string | null
           id: string
+          invoice_date: string | null
+          invoice_number: string | null
           notes: string | null
           order_date: string
           po_number: string
@@ -166,11 +186,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          comment?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           expected_date?: string | null
           id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
           notes?: string | null
           order_date?: string
           po_number?: string
@@ -182,11 +205,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          comment?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
           expected_date?: string | null
           id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
           notes?: string | null
           order_date?: string
           po_number?: string
@@ -276,7 +302,82 @@ export type Database = {
             foreignKeyName: "receipts_po_id_fkey"
             columns: ["po_id"]
             isOneToOne: false
+            referencedRelation: "po_payment_status"
+            referencedColumns: ["po_id"]
+          },
+          {
+            foreignKeyName: "receipts_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
             referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_addresses: {
+        Row: {
+          address_type: string
+          city: string | null
+          contact_name: string | null
+          country: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_default: boolean
+          label: string
+          line1: string | null
+          line2: string | null
+          notes: string | null
+          phone: string | null
+          postal_code: string | null
+          state: string | null
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          address_type?: string
+          city?: string | null
+          contact_name?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_default?: boolean
+          label?: string
+          line1?: string | null
+          line2?: string | null
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          state?: string | null
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          address_type?: string
+          city?: string | null
+          contact_name?: string | null
+          country?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_default?: boolean
+          label?: string
+          line1?: string | null
+          line2?: string | null
+          notes?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          state?: string | null
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_addresses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -344,57 +445,170 @@ export type Database = {
           },
         ]
       }
+      supplier_products: {
+        Row: {
+          created_at: string
+          currency: string
+          drop_ship: boolean
+          fixed_price: number | null
+          id: string
+          latest_price: number
+          notes: string | null
+          product_id: string
+          supplier_id: string
+          supplier_sku: string | null
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          drop_ship?: boolean
+          fixed_price?: number | null
+          id?: string
+          latest_price?: number
+          notes?: string | null
+          product_id: string
+          supplier_id: string
+          supplier_sku?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          drop_ship?: boolean
+          fixed_price?: number | null
+          id?: string
+          latest_price?: number
+          notes?: string | null
+          product_id?: string
+          supplier_id?: string
+          supplier_sku?: string | null
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
+          account_payable: string | null
           address: string | null
+          carrier: string | null
           code: string | null
+          comments: string | null
           contact_name: string | null
           created_at: string
           currency: string
+          discount: number
           email: string | null
+          fax: string | null
           id: string
           is_active: boolean
+          job_title: string | null
+          mobile_phone: string | null
           name: string
           notes: string | null
           payment_terms: string | null
           phone: string | null
+          status: string
+          tax_number: string | null
+          tax_rule: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
+          account_payable?: string | null
           address?: string | null
+          carrier?: string | null
           code?: string | null
+          comments?: string | null
           contact_name?: string | null
           created_at?: string
           currency?: string
+          discount?: number
           email?: string | null
+          fax?: string | null
           id?: string
           is_active?: boolean
+          job_title?: string | null
+          mobile_phone?: string | null
           name: string
           notes?: string | null
           payment_terms?: string | null
           phone?: string | null
+          status?: string
+          tax_number?: string | null
+          tax_rule?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
+          account_payable?: string | null
           address?: string | null
+          carrier?: string | null
           code?: string | null
+          comments?: string | null
           contact_name?: string | null
           created_at?: string
           currency?: string
+          discount?: number
           email?: string | null
+          fax?: string | null
           id?: string
           is_active?: boolean
+          job_title?: string | null
+          mobile_phone?: string | null
           name?: string
           notes?: string | null
           payment_terms?: string | null
           phone?: string | null
+          status?: string
+          tax_number?: string | null
+          tax_rule?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
     }
     Views: {
-      [_ in never]: never
+      po_payment_status: {
+        Row: {
+          amount_paid: number | null
+          balance_remaining: number | null
+          order_date: string | null
+          po_id: string | null
+          po_number: string | null
+          status: Database["public"]["Enums"]["po_status"] | null
+          supplier_id: string | null
+          total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       [_ in never]: never

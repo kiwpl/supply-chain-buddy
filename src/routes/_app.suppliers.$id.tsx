@@ -10,21 +10,58 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Table, TableHeader, TableHead, TableRow, TableBody, TableCell } from "@/components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableHead,
+  TableRow,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 import { SupplierDialog } from "./_app.suppliers.index";
 import { POStatusBadge } from "@/components/status-badge";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
+import type { Tables } from "@/integrations/supabase/types";
+
+type SupplierDetailRow = Tables<"suppliers">;
+type SupplierPriceRow = Tables<"supplier_prices"> & {
+  product?: Pick<Tables<"products">, "sku" | "name"> | null;
+};
+type SupplierPurchaseOrder = Tables<"purchase_orders"> & {
+  amount_paid?: number;
+  balance_due?: number;
+};
+type SupplierPaymentRow = Tables<"po_payments"> & {
+  po?: Pick<Tables<"purchase_orders">, "id" | "po_number"> | null;
+};
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong";
+}
 
 export const Route = createFileRoute("/_app/suppliers/$id")({
   head: () => ({ meta: [{ title: "Supplier" }] }),
   loader: async ({ params, context }) => {
     await Promise.all([
-      context.queryClient.ensureQueryData({ queryKey: ["supplier", params.id], queryFn: () => getSupplier({ data: { id: params.id } }) }),
-      context.queryClient.ensureQueryData({ queryKey: ["supplier-prices", params.id], queryFn: () => listSupplierPrices({ data: { supplier_id: params.id } }) }),
-      context.queryClient.ensureQueryData({ queryKey: ["purchase-orders"], queryFn: () => listPurchaseOrders() }),
-      context.queryClient.ensureQueryData({ queryKey: ["payments"], queryFn: () => listPayments() }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["supplier", params.id],
+        queryFn: () => getSupplier({ data: { id: params.id } }),
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["supplier-prices", params.id],
+        queryFn: () => listSupplierPrices({ data: { supplier_id: params.id } }),
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["purchase-orders"],
+        queryFn: () => listPurchaseOrders(),
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["payments"],
+        queryFn: () => listPayments(),
+      }),
     ]);
   },
   component: SupplierDetail,
@@ -38,15 +75,31 @@ function SupplierDetail() {
   const [edit, setEdit] = useState(false);
   const del = useServerFn(deleteSupplier);
 
-  const { data: supplier } = useSuspenseQuery({ queryKey: ["supplier", id], queryFn: () => getSupplier({ data: { id } }) });
-  const { data: prices } = useSuspenseQuery({ queryKey: ["supplier-prices", id], queryFn: () => listSupplierPrices({ data: { supplier_id: id } }) });
-  const { data: pos } = useSuspenseQuery({ queryKey: ["purchase-orders"], queryFn: () => listPurchaseOrders() });
-  const { data: payments } = useSuspenseQuery({ queryKey: ["payments"], queryFn: () => listPayments() });
+  const { data: supplierData } = useSuspenseQuery({
+    queryKey: ["supplier", id],
+    queryFn: () => getSupplier({ data: { id } }),
+  });
+  const supplier = supplierData as SupplierDetailRow | null;
+  const { data: pricesData } = useSuspenseQuery({
+    queryKey: ["supplier-prices", id],
+    queryFn: () => listSupplierPrices({ data: { supplier_id: id } }),
+  });
+  const prices = pricesData as SupplierPriceRow[];
+  const { data: posData } = useSuspenseQuery({
+    queryKey: ["purchase-orders"],
+    queryFn: () => listPurchaseOrders(),
+  });
+  const pos = posData as SupplierPurchaseOrder[];
+  const { data: paymentsData } = useSuspenseQuery({
+    queryKey: ["payments"],
+    queryFn: () => listPayments(),
+  });
+  const payments = paymentsData as SupplierPaymentRow[];
 
   if (!supplier) return <div>Supplier not found.</div>;
 
-  const supplierPOs = pos.filter((p: any) => p.supplier_id === id);
-  const supplierPayments = payments.filter((p: any) => p.po?.supplier?.name === supplier.name);
+  const supplierPOs = pos.filter((p) => p.supplier_id === id);
+  const supplierPayments = payments.filter((p) => supplierPOs.some((po) => po.id === p.po?.id));
 
   const onDelete = async () => {
     if (!confirm("Delete this supplier? This cannot be undone.")) return;
@@ -55,18 +108,28 @@ function SupplierDetail() {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("Supplier deleted");
       navigate({ to: "/suppliers" });
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e));
+    }
   };
 
   return (
     <div>
       <PageHeader
         title={supplier.name}
-        description={[supplier.code, supplier.payment_terms].filter(Boolean).join(" · ") || "Supplier"}
+        description={
+          [supplier.code, supplier.payment_terms].filter(Boolean).join(" · ") || "Supplier"
+        }
         actions={
           <>
-            <Button variant="outline" onClick={() => setEdit(true)}><Pencil className="h-4 w-4 mr-1" />Edit</Button>
-            <Button variant="outline" onClick={onDelete}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+            <Button variant="outline" onClick={() => setEdit(true)}>
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+            <Button variant="outline" onClick={onDelete}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
           </>
         }
       />
@@ -104,17 +167,32 @@ function SupplierDetail() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {prices.map((p: any) => (
+                {prices.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell><Link to="/products" className="hover:underline">{p.product?.sku} · {p.product?.name}</Link></TableCell>
+                    <TableCell>
+                      <Link to="/products" className="hover:underline">
+                        {p.product?.sku} · {p.product?.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{p.supplier_sku ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtMoney(p.unit_price, p.currency)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtMoney(p.unit_price, p.currency)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{p.min_qty}</TableCell>
-                    <TableCell className="text-right">{p.lead_time_days ? `${p.lead_time_days} d` : "—"}</TableCell>
+                    <TableCell className="text-right">
+                      {p.lead_time_days ? `${p.lead_time_days} d` : "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
                 {prices.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No prices yet. Add them from the Products page.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-sm text-muted-foreground py-8"
+                    >
+                      No prices yet. Add them from the Products page.
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -125,19 +203,43 @@ function SupplierDetail() {
           <Card>
             <Table>
               <TableHeader>
-                <TableRow><TableHead>PO #</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Total</TableHead></TableRow>
+                <TableRow>
+                  <TableHead>PO #</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
-                {supplierPOs.map((po: any) => (
+                {supplierPOs.map((po) => (
                   <TableRow key={po.id}>
-                    <TableCell><Link to="/purchase-orders/$id" params={{ id: po.id }} className="hover:underline">{po.po_number}</Link></TableCell>
+                    <TableCell>
+                      <Link
+                        to="/purchase-orders/$id"
+                        params={{ id: po.id }}
+                        className="hover:underline"
+                      >
+                        {po.po_number}
+                      </Link>
+                    </TableCell>
                     <TableCell>{fmtDate(po.order_date)}</TableCell>
-                    <TableCell><POStatusBadge status={po.status} /></TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtMoney(po.total, po.currency)}</TableCell>
+                    <TableCell>
+                      <POStatusBadge status={po.status} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtMoney(po.total, po.currency)}
+                    </TableCell>
                   </TableRow>
                 ))}
                 {supplierPOs.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">No POs for this supplier.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="text-center text-sm text-muted-foreground py-8"
+                    >
+                      No POs for this supplier.
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -148,20 +250,33 @@ function SupplierDetail() {
           <Card>
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Date</TableHead><TableHead>PO</TableHead><TableHead>Method</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead></TableRow>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>PO</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
-                {supplierPayments.map((p: any) => (
+                {supplierPayments.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell>{fmtDate(p.payment_date)}</TableCell>
                     <TableCell>{p.po?.po_number}</TableCell>
-                    <TableCell className="capitalize">{p.method.replace("_"," ")}</TableCell>
+                    <TableCell className="capitalize">{p.method.replace("_", " ")}</TableCell>
                     <TableCell>{p.reference ?? "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtMoney(p.amount)}</TableCell>
                   </TableRow>
                 ))}
                 {supplierPayments.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No payments recorded.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-sm text-muted-foreground py-8"
+                    >
+                      No payments recorded.
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -174,7 +289,7 @@ function SupplierDetail() {
   );
 }
 
-function Field({ label, v, cls }: { label: string; v: any; cls?: string }) {
+function Field({ label, v, cls }: { label: string; v: ReactNode; cls?: string }) {
   return (
     <div className={cls}>
       <div className="text-xs text-muted-foreground">{label}</div>

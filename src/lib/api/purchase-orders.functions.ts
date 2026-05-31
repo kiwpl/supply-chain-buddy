@@ -1,6 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Tables } from "@/integrations/supabase/types";
+
+type PaymentAmount = { amount: number | string | null };
+type PurchaseOrderLine = Tables<"purchase_order_lines">;
+type PurchaseOrderSummary = Tables<"purchase_orders"> & {
+  payments?: PaymentAmount[] | null;
+};
+type PurchaseOrderDetail = Tables<"purchase_orders"> & {
+  payments?: PaymentAmount[] | null;
+  lines?: PurchaseOrderLine[] | null;
+};
+type ExistingLine = Pick<PurchaseOrderLine, "id" | "qty_received">;
 
 const lineSchema = z.object({
   id: z.string().uuid().optional(),
@@ -29,6 +41,10 @@ function recomputeTotals(lines: { qty_ordered: number; unit_price: number }[], t
   };
 }
 
+function roundMoney(value: number) {
+  return Number(value.toFixed(2));
+}
+
 export const listPurchaseOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -37,9 +53,13 @@ export const listPurchaseOrders = createServerFn({ method: "GET" })
       .select("*, supplier:suppliers(id,name,code), payments:po_payments(amount)")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? []).map((po: any) => {
-      const paid = (po.payments ?? []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
-      return { ...po, amount_paid: paid, balance_due: Number(po.total) - paid };
+    return ((data ?? []) as PurchaseOrderSummary[]).map((po) => {
+      const paid = (po.payments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0);
+      return {
+        ...po,
+        amount_paid: roundMoney(paid),
+        balance_due: roundMoney(Number(po.total) - paid),
+      };
     });
   });
 
@@ -49,13 +69,24 @@ export const getPurchaseOrder = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: po, error } = await context.supabase
       .from("purchase_orders")
-      .select("*, supplier:suppliers(*), lines:purchase_order_lines(*, product:products(id,sku,name,unit)), receipts(*, lines:receipt_lines(*)), payments:po_payments(*)")
-      .eq("id", data.id).maybeSingle();
+      .select(
+        "*, supplier:suppliers(*), lines:purchase_order_lines(*, product:products(id,sku,name,unit)), receipts(*, lines:receipt_lines(*)), payments:po_payments(*)",
+      )
+      .eq("id", data.id)
+      .maybeSingle();
     if (error) throw new Error(error.message);
     if (!po) return null;
-    const paid = (po.payments ?? []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
-    const sortedLines = [...(po.lines ?? [])].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
-    return { ...po, lines: sortedLines, amount_paid: paid, balance_due: Number(po.total) - paid };
+    const typedPo = po as PurchaseOrderDetail;
+    const paid = (typedPo.payments ?? []).reduce((s, p) => s + Number(p.amount || 0), 0);
+    const sortedLines = [...(typedPo.lines ?? [])].sort(
+      (a: PurchaseOrderLine, b: PurchaseOrderLine) => (a.position ?? 0) - (b.position ?? 0),
+    );
+    return {
+      ...po,
+      lines: sortedLines,
+      amount_paid: roundMoney(paid),
+      balance_due: roundMoney(Number(po.total) - paid),
+    };
   });
 
 export const savePurchaseOrder = createServerFn({ method: "POST" })
@@ -71,38 +102,56 @@ export const savePurchaseOrder = createServerFn({ method: "POST" })
     };
     let poId = id;
     if (poId) {
-      const { error } = await context.supabase.from("purchase_orders").update(payload).eq("id", poId);
+      const { error } = await context.supabase
+        .from("purchase_orders")
+        .update(payload)
+        .eq("id", poId);
       if (error) throw new Error(error.message);
     } else {
       const { data: ins, error } = await context.supabase
-        .from("purchase_orders").insert({ ...payload, created_by: context.userId })
-        .select("id").single();
+        .from("purchase_orders")
+        .insert({ ...payload, created_by: context.userId })
+        .select("id")
+        .single();
       if (error) throw new Error(error.message);
       poId = ins.id;
     }
 
     // Replace lines (simple, safe for draft editing)
     const { data: existing } = await context.supabase
-      .from("purchase_order_lines").select("id, qty_received").eq("po_id", poId);
+      .from("purchase_order_lines")
+      .select("id, qty_received")
+      .eq("po_id", poId);
     const keepIds = new Set(lines.filter((l) => l.id).map((l) => l.id));
-    const toDelete = (existing ?? []).filter((e: any) => !keepIds.has(e.id));
+    const toDelete = ((existing ?? []) as ExistingLine[]).filter((e) => !keepIds.has(e.id));
     if (toDelete.length) {
-      await context.supabase.from("purchase_order_lines").delete().in("id", toDelete.map((e: any) => e.id));
+      const { error } = await context.supabase
+        .from("purchase_order_lines")
+        .delete()
+        .in(
+          "id",
+          toDelete.map((e) => e.id),
+        );
+      if (error) throw new Error(error.message);
     }
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i];
       const lineTotal = Number((l.qty_ordered * l.unit_price).toFixed(2));
       if (l.id) {
-        await context.supabase.from("purchase_order_lines").update({
-          product_id: l.product_id ?? null,
-          description: l.description,
-          qty_ordered: l.qty_ordered,
-          unit_price: l.unit_price,
-          line_total: lineTotal,
-          position: i,
-        }).eq("id", l.id);
+        const { error } = await context.supabase
+          .from("purchase_order_lines")
+          .update({
+            product_id: l.product_id ?? null,
+            description: l.description,
+            qty_ordered: l.qty_ordered,
+            unit_price: l.unit_price,
+            line_total: lineTotal,
+            position: i,
+          })
+          .eq("id", l.id);
+        if (error) throw new Error(error.message);
       } else {
-        await context.supabase.from("purchase_order_lines").insert({
+        const { error } = await context.supabase.from("purchase_order_lines").insert({
           po_id: poId,
           product_id: l.product_id ?? null,
           description: l.description,
@@ -111,6 +160,7 @@ export const savePurchaseOrder = createServerFn({ method: "POST" })
           line_total: lineTotal,
           position: i,
         });
+        if (error) throw new Error(error.message);
       }
     }
     return { id: poId };
@@ -119,12 +169,18 @@ export const savePurchaseOrder = createServerFn({ method: "POST" })
 export const setPOStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string; status: string }) =>
-    z.object({
-      id: z.string().uuid(),
-      status: z.enum(["draft","sent","partially_received","received","closed","cancelled"]),
-    }).parse(d))
+    z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["draft", "sent", "partially_received", "received", "closed", "cancelled"]),
+      })
+      .parse(d),
+  )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("purchase_orders").update({ status: data.status }).eq("id", data.id);
+    const { error } = await context.supabase
+      .from("purchase_orders")
+      .update({ status: data.status })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

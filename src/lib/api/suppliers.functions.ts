@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Tables } from "@/integrations/supabase/types";
+
+type SupplierName = Pick<Tables<"suppliers">, "id" | "name">;
 
 const supplierSchema = z.object({
   id: z.string().uuid().optional(),
@@ -16,11 +19,19 @@ const supplierSchema = z.object({
   is_active: z.boolean().default(true),
 });
 
+function normalizeSupplierName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeSupplierCode(code?: string | null) {
+  const normalized = code?.trim().toUpperCase();
+  return normalized || null;
+}
+
 export const listSuppliers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("suppliers").select("*").order("name");
+    const { data, error } = await context.supabase.from("suppliers").select("*").order("name");
     if (error) throw new Error(error.message);
     return data;
   });
@@ -30,7 +41,10 @@ export const getSupplier = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
-      .from("suppliers").select("*").eq("id", data.id).maybeSingle();
+      .from("suppliers")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
     if (error) throw new Error(error.message);
     return row;
   });
@@ -39,13 +53,36 @@ export const upsertSupplier = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => supplierSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const payload = { ...data, email: data.email || null };
+    const normalizedName = normalizeSupplierName(data.name);
+    const { data: suppliers, error: suppliersErr } = await context.supabase
+      .from("suppliers")
+      .select("id, name");
+    if (suppliersErr) throw new Error(suppliersErr.message);
+
+    const duplicate = ((suppliers ?? []) as SupplierName[]).find(
+      (supplier) =>
+        supplier.id !== data.id && normalizeSupplierName(supplier.name) === normalizedName,
+    );
+    if (duplicate) {
+      throw new Error(`Supplier name conflicts with existing supplier "${duplicate.name}"`);
+    }
+
+    const payload = {
+      ...data,
+      name: data.name.trim().replace(/\s+/g, " "),
+      code: normalizeSupplierCode(data.code),
+      email: data.email || null,
+    };
     if (data.id) {
       const { error } = await context.supabase.from("suppliers").update(payload).eq("id", data.id);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
-    const { data: ins, error } = await context.supabase.from("suppliers").insert(payload).select("id").single();
+    const { data: ins, error } = await context.supabase
+      .from("suppliers")
+      .insert(payload)
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
     return { id: ins.id };
   });

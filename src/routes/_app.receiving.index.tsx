@@ -36,8 +36,9 @@ function ReceivingPage() {
             <TableHeader><TableRow><TableHead>PO</TableHead><TableHead>Supplier</TableHead><TableHead>Expected</TableHead><TableHead>Progress</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
             <TableBody>
               {awaiting.map((po: any) => {
-                const ordered = po.lines.reduce((s: number, l: any) => s + Number(l.qty_ordered), 0);
-                const received = po.lines.reduce((s: number, l: any) => s + Number(l.qty_received), 0);
+                const lines = po.lines ?? [];
+                const ordered = lines.reduce((s: number, l: any) => s + Number(l.qty_ordered), 0);
+                const received = lines.reduce((s: number, l: any) => s + Number(l.qty_received), 0);
                 return (
                   <TableRow key={po.id}>
                     <TableCell><Link to="/receiving/$id" params={{ id: po.id }} className="font-medium hover:underline">{po.po_number}</Link></TableCell>
@@ -63,7 +64,11 @@ function ReceivingPage() {
               {receipts.map((r: any) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.receipt_number}</TableCell>
-                  <TableCell><Link to="/purchase-orders/$id" params={{ id: r.po?.id }} className="hover:underline">{r.po?.po_number}</Link></TableCell>
+                  <TableCell>
+                    {r.po?.id ? (
+                      <Link to="/purchase-orders/$id" params={{ id: r.po.id }} className="hover:underline">{r.po.po_number}</Link>
+                    ) : "â€”"}
+                  </TableCell>
                   <TableCell>{r.po?.supplier?.name}</TableCell>
                   <TableCell>{fmtDate(r.received_date)}</TableCell>
                 </TableRow>

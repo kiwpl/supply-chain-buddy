@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { listProducts, upsertProduct, deleteProduct, listSupplierPrices, upsertSupplierPrice, deleteSupplierPrice } from "@/lib/api/products.functions";
 import { listSuppliers } from "@/lib/api/suppliers.functions";
 import { PageHeader } from "@/components/page-header";
@@ -176,9 +176,11 @@ function ProductDialog({ state, onClose }: { state: { open: boolean; initial?: a
   const save = useServerFn(upsertProduct);
   const [form, setForm] = useState<any>(state.initial ?? { sku: "", name: "", unit: "ea", is_active: true });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-  // reset when opened
-  if (state.open && state.initial && state.initial.id !== form.id) setForm(state.initial);
-  if (state.open && !state.initial && form.id) setForm({ sku: "", name: "", unit: "ea", is_active: true });
+
+  useEffect(() => {
+    if (!state.open) return;
+    setForm(state.initial ?? { sku: "", name: "", unit: "ea", is_active: true });
+  }, [state.open, state.initial]);
 
   const m = useMutation({
     mutationFn: () => save({ data: form }),
@@ -211,8 +213,11 @@ function PriceDialog({ state, onClose, suppliers, productId }: {
   const qc = useQueryClient();
   const save = useServerFn(upsertSupplierPrice);
   const [form, setForm] = useState<any>(state.initial ?? {});
-  if (state.open && state.initial && state.initial.id !== form.id) setForm(state.initial);
-  if (state.open && !state.initial?.id && form.id) setForm({ product_id: productId, currency: "USD", min_qty: 1, unit_price: 0 });
+
+  useEffect(() => {
+    if (!state.open) return;
+    setForm(state.initial ?? { product_id: productId, currency: "USD", min_qty: 1, unit_price: 0 });
+  }, [state.open, state.initial, productId]);
 
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
   const m = useMutation({

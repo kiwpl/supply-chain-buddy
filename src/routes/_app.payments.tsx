@@ -130,13 +130,15 @@ function PaymentsPage() {
               <TableRow key={p.id}>
                 <TableCell>{fmtDate(p.payment_date)}</TableCell>
                 <TableCell>
-                  <Link
-                    to="/purchase-orders/$id"
-                    params={{ id: p.po?.id }}
-                    className="hover:underline"
-                  >
-                    {p.po?.po_number}
-                  </Link>
+                  {p.po?.id ? (
+                    <Link
+                      to="/purchase-orders/$id"
+                      params={{ id: p.po.id }}
+                      className="hover:underline"
+                    >
+                      {p.po.po_number}
+                    </Link>
+                  ) : "â€”"}
                 </TableCell>
                 <TableCell>{p.po?.supplier?.name}</TableCell>
                 <TableCell className="capitalize">{p.method.replace("_", " ")}</TableCell>

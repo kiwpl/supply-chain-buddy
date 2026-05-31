@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { listSuppliers, upsertSupplier } from "@/lib/api/suppliers.functions";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export const Route = createFileRoute("/_app/suppliers/")({
 
 function SuppliersPage() {
   const { data } = useSuspenseQuery(suppliersOpts);
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const filtered = data.filter((s: any) =>
@@ -59,7 +60,7 @@ function SuppliersPage() {
           </TableHeader>
           <TableBody>
             {filtered.map((s: any) => (
-              <TableRow key={s.id} className="cursor-pointer" onClick={() => location.assign(`/suppliers/${s.id}`)}>
+              <TableRow key={s.id} className="cursor-pointer" onClick={() => navigate({ to: "/suppliers/$id", params: { id: s.id } })}>
                 <TableCell className="font-medium">
                   <Link to="/suppliers/$id" params={{ id: s.id }} className="hover:underline">{s.name}</Link>
                 </TableCell>
@@ -94,6 +95,11 @@ export function SupplierDialog({ open, onOpenChange, initial }: {
   const save = useServerFn(upsertSupplier);
   const [form, setForm] = useState<any>(initial ?? { name: "", currency: "USD", is_active: true });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(initial ?? { name: "", currency: "USD", is_active: true });
+  }, [open, initial]);
 
   const m = useMutation({
     mutationFn: async () => save({ data: form }),
